@@ -310,17 +310,18 @@ macro buildSvg*(body: untyped): Nodes =
   result = buildNodesBlock(body(kids), 0)
 
 
-proc ensureParentDirExists(filename: string) =
-  let parent = parentDir(filename)
-  if parent != "":
-    createDir(parent)
+when not defined js:
+  proc ensureParentDirExists(filename: string) =
+    let parent = parentDir(filename)
+    if parent != "":
+      createDir(parent)
 
 
-template buildSvgFile*(filename: string, body: untyped): untyped =
-  ensureParentDirExists(filename)
-  let nodes = buildSvg(body)
-  withFile(f, filename):
-    f.write(nodes.render())
+  template buildSvgFile*(filename: string, body: untyped): untyped =
+    ensureParentDirExists(filename)
+    let nodes = buildSvg(body)
+    withFile(f, filename):
+      f.write(nodes.render())
 
 
 # -----------------------------------------------------------------------------
@@ -348,49 +349,50 @@ proc animSettings*(
     backAndForth: backAndForth,
   )
 
-proc buildAnimation*(settings: AnimSettings, numFrames: int, builder: int -> Nodes) =
-  let filenameBase = settings.filenameBase
+when not defined js:
+  proc buildAnimation*(settings: AnimSettings, numFrames: int, builder: int -> Nodes) =
+    let filenameBase = settings.filenameBase
 
-  createDir(filenameBase & "_frames")
-  let filenameOnly = filenameBase.splitFile().name
+    createDir(filenameBase & "_frames")
+    let filenameOnly = filenameBase.splitFile().name
 
-  proc svgFrameFileName(suffix: string): string =
-    filenameBase & "_frames" / filenameOnly & "_frame_" & suffix & ".svg"
+    proc svgFrameFileName(suffix: string): string =
+      filenameBase & "_frames" / filenameOnly & "_frame_" & suffix & ".svg"
 
-  var htmlWriter = HtmlWriter()
+    var htmlWriter = HtmlWriter()
 
-  for i in 0 ..< numFrames:
-    let filename = svgFrameFileName(align($i, 4, '0'))
-    let nodes = builder(i)
-    let svgCode = nodes.render()
-    withFile(f, filename):
-      f.write(svgCode)
-    htmlWriter.addFrame(svgCode)
+    for i in 0 ..< numFrames:
+      let filename = svgFrameFileName(align($i, 4, '0'))
+      let nodes = builder(i)
+      let svgCode = nodes.render()
+      withFile(f, filename):
+        f.write(svgCode)
+      htmlWriter.addFrame(svgCode)
 
-  htmlWriter.writeHtml(filenameBase & ".html")
+    htmlWriter.writeHtml(filenameBase & ".html")
 
-  if settings.renderGif:
-    let pattern = svgFrameFileName("*")
-    let outFile = filenameBase & ".gif"
+    if settings.renderGif:
+      let pattern = svgFrameFileName("*")
+      let outFile = filenameBase & ".gif"
 
-    var cmdElems = @[
-      "convert",
-      "-delay", $settings.gifFrameTime,
-      "-loop", "0",
-      "-dispose", "previous",
-      pattern
-    ]
-    if settings.backAndForth:
-      cmdElems &= @[
-        "-reverse",
+      var cmdElems = @[
+        "convert",
+        "-delay", $settings.gifFrameTime,
+        "-loop", "0",
+        "-dispose", "previous",
         pattern
       ]
-    cmdElems &= outfile
+      if settings.backAndForth:
+        cmdElems &= @[
+          "-reverse",
+          pattern
+        ]
+      cmdElems &= outfile
 
-    let cmd = cmdElems.join(" ")
+      let cmd = cmdElems.join(" ")
 
-    echo "Running: ", cmd
-    discard execShellCmd(cmd)
+      echo "Running: ", cmd
+      discard execShellCmd(cmd)
 
 
 # -----------------------------------------------------------------------------
